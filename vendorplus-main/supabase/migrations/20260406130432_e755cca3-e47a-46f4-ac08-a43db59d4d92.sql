@@ -1,1 +1,0 @@
-CREATE POLICY "Authenticated users can lookup profiles by username" ON public.profiles FOR SELECT TO authenticated USING (true);
