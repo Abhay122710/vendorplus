@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,26 @@ import logo from "@/assets/logo.jpg";
 import { useLanguage } from "@/lib/language-context";
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const location = useLocation();
+  const initialUsername = (location.state as { username?: string } | null)?.username || "";
+  const [username, setUsername] = useState(initialUsername);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { loginWithUsername } = useAuth();
+  const { loginWithUsername, user, profile } = useAuth();
   const navigate = useNavigate();
   const { tr } = useLanguage();
+
+  useEffect(() => {
+    if (user && profile) {
+      if (profile.role === "admin") {
+        navigate("/admin", { replace: true });
+      } else if (profile.role === "shopowner") {
+        navigate("/dashboard", { replace: true });
+      } else {
+        navigate("/marketplace", { replace: true });
+      }
+    }
+  }, [user, profile, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,11 +63,29 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="username">{tr("login.username")}</Label>
-              <Input id="username" type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={tr("login.usernamePlaceholder")} required />
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder={tr("login.usernamePlaceholder")}
+                required
+              />
             </div>
             <div>
               <Label htmlFor="password">{tr("login.password")}</Label>
-              <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={tr("login.passwordPlaceholder")} required />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={tr("login.passwordPlaceholder")}
+                required
+              />
             </div>
             <div className="text-right">
               <Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">

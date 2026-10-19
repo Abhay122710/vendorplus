@@ -73,7 +73,17 @@ function getLocalUsers(): LocalUserRecord[] {
 function saveLocalUser(user: LocalUserRecord): void {
   if (typeof window === "undefined") return;
   const users = getLocalUsers();
-  users.push(user);
+  const existingIdx = users.findIndex(
+    (u) =>
+      u.id === user.id ||
+      u.username.toLowerCase() === user.username.toLowerCase() ||
+      u.email.toLowerCase() === user.email.toLowerCase()
+  );
+  if (existingIdx !== -1) {
+    users[existingIdx] = { ...users[existingIdx], ...user };
+  } else {
+    users.push(user);
+  }
   localStorage.setItem("vendorplus_local_users", JSON.stringify(users));
 }
 
@@ -185,9 +195,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
       if (!error && data) {
-        setProfile(data as Profile);
+        const prof = data as Profile;
+        setProfile(prof);
+        const curr = getSavedSession();
+        if (curr) {
+          saveCurrentSession(curr.user, prof, curr.session);
+        }
         return;
       }
     } catch {
@@ -196,14 +211,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const localUsers = getLocalUsers();
     const found = localUsers.find((u) => u.id === userId);
     if (found) {
-      setProfile({
+      const prof: Profile = {
         id: found.id,
         username: found.username,
         name: found.name,
         email: found.email,
         phone: found.phone,
         role: found.role,
-      });
+      };
+      setProfile(prof);
+      const curr = getSavedSession();
+      if (curr) {
+        saveCurrentSession(curr.user, prof, curr.session);
+      }
     }
   };
 
@@ -213,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(saved.user);
       setProfile(saved.profile);
       setSession(saved.session);
+      setLoading(false);
     }
 
     try {
@@ -221,10 +242,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(newSession);
           setUser(newSession.user);
           setTimeout(() => fetchProfile(newSession.user.id), 0);
-        } else if (!saved) {
-          setProfile(null);
-          setUser(null);
-          setSession(null);
+        } else {
+          const currentSaved = getSavedSession();
+          if (!currentSaved) {
+            setProfile(null);
+            setUser(null);
+            setSession(null);
+          }
         }
         setLoading(false);
       });
@@ -247,29 +271,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    const cleanEmail = email.trim().toLowerCase();
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (!error && data?.user) {
         let role = "customer";
+        let userProfile: Profile = {
+          id: data.user.id,
+          email: data.user.email || cleanEmail,
+          name: (data.user.user_metadata?.name as string) || null,
+          username: (data.user.user_metadata?.username as string) || null,
+          phone: (data.user.user_metadata?.phone as string) || null,
+          role: "customer",
+        };
         try {
-          const { data: prof } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
-          if (prof?.role) role = prof.role;
+          const { data: prof } = await supabase.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
+          if (prof) {
+            userProfile = prof as Profile;
+            role = prof.role || "customer";
+          }
         } catch {
           // ignore profile fetch error
         }
+        setUser(data.user);
+        setProfile(userProfile);
+        setSession(data.session);
+        saveCurrentSession(data.user, userProfile, data.session);
         return { success: true, role };
       }
-      if (error && !isNetworkError(error)) {
-        return { success: false, error: error.message };
-      }
-    } catch (err) {
-      if (!isNetworkError(err)) {
-        return { success: false, error: err instanceof Error ? err.message : "Login failed" };
-      }
+    } catch {
+      // offline / Supabase issue, fall through to local storage
     }
 
     const localUsers = getLocalUsers();
-    const found = localUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const found = localUsers.find((u) => u.email.toLowerCase() === cleanEmail);
     if (found) {
       if (found.password && found.password !== password) {
         return { success: false, error: "Invalid password" };
@@ -295,30 +330,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithUsername = useCallback(async (username: string, password: string) => {
+    const cleanIdentifier = username.trim().toLowerCase();
+
+    // 1. Try Supabase lookup by username OR email
     try {
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
-        .select("email, role")
-        .eq("username", username)
-        .single();
+        .select("id, email, role, username, name, phone")
+        .or(`username.ilike.${cleanIdentifier},email.ilike.${cleanIdentifier}`)
+        .maybeSingle();
 
       if (profileData?.email) {
-        const { error } = await supabase.auth.signInWithPassword({ email: profileData.email, password });
-        if (!error) return { success: true, role: profileData.role || "customer" };
-        if (error && !isNetworkError(error)) {
-          return { success: false, error: error.message };
+        const { data: authData, error } = await supabase.auth.signInWithPassword({
+          email: profileData.email,
+          password,
+        });
+        if (!error && authData?.user) {
+          const role = profileData.role || "customer";
+          const userProf: Profile = {
+            id: profileData.id || authData.user.id,
+            username: profileData.username,
+            name: profileData.name,
+            email: profileData.email,
+            phone: profileData.phone,
+            role,
+          };
+          setUser(authData.user);
+          setProfile(userProf);
+          setSession(authData.session);
+          saveCurrentSession(authData.user, userProf, authData.session);
+          return { success: true, role };
         }
-      } else if (profileError && !isNetworkError(profileError)) {
-        return { success: false, error: "Username not found" };
       }
-    } catch (err) {
-      if (!isNetworkError(err)) {
-        return { success: false, error: err instanceof Error ? err.message : "Login failed" };
-      }
+    } catch {
+      // offline / supabase error, fall through to local storage
     }
 
+    // 2. Fall back to local users database
     const localUsers = getLocalUsers();
-    const found = localUsers.find((u) => u.username.toLowerCase() === username.toLowerCase());
+    const found = localUsers.find(
+      (u) =>
+        u.username.toLowerCase() === cleanIdentifier ||
+        u.email.toLowerCase() === cleanIdentifier
+    );
+
     if (found) {
       if (found.password && found.password !== password) {
         return { success: false, error: "Invalid password" };
@@ -344,9 +399,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signup = useCallback(async (email: string, password: string, name: string, phone: string, username: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim().toLowerCase();
+
+    const localUsers = getLocalUsers();
+    if (localUsers.some((u) => u.username.toLowerCase() === cleanUsername)) {
+      return { success: false, error: "Username already exists" };
+    }
+    if (localUsers.some((u) => u.email.toLowerCase() === cleanEmail)) {
+      return { success: false, error: "Email already registered" };
+    }
+
+    const newUserRecord: LocalUserRecord = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      username: username.trim(),
+      name: name.trim(),
+      email: cleanEmail,
+      phone: phone.trim(),
+      role: "customer",
+      password,
+      created_at: new Date().toISOString(),
+    };
+
     try {
       const { data: limitCheck, error: limitErr } = await supabase.rpc("check_account_limit", {
-        check_email: email,
+        check_email: cleanEmail,
         check_phone: phone || null,
       });
 
@@ -356,44 +433,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { success: false, error: check.reason };
         }
 
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { data: authData, error } = await supabase.auth.signUp({
+          email: cleanEmail,
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { name, phone, username },
+            data: { name: name.trim(), phone: phone.trim(), username: username.trim() },
           },
         });
-        if (!error) return { success: true, role: "customer" };
-        if (error && !isNetworkError(error)) {
-          return { success: false, error: error.message };
+
+        if (!error && authData?.user?.id) {
+          newUserRecord.id = authData.user.id;
+          try {
+            await supabase.from("profiles").upsert({
+              id: newUserRecord.id,
+              username: newUserRecord.username,
+              name: newUserRecord.name,
+              email: newUserRecord.email,
+              phone: newUserRecord.phone,
+              role: "customer",
+            });
+          } catch {
+            // ignore
+          }
         }
       }
-    } catch (err) {
-      if (!isNetworkError(err)) {
-        return { success: false, error: err instanceof Error ? err.message : "Signup failed" };
-      }
+    } catch {
+      // offline / supabase error, continue saving locally
     }
 
-    // Local offline signup fallback
-    const localUsers = getLocalUsers();
-    if (localUsers.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
-      return { success: false, error: "Username already exists" };
-    }
-    if (localUsers.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-      return { success: false, error: "Email already registered" };
-    }
-
-    const newUserRecord: LocalUserRecord = {
-      id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      username,
-      name,
-      email,
-      phone,
-      role: "customer",
-      password,
-      created_at: new Date().toISOString(),
-    };
+    // Always persist to local users so login credentials work reliably
     saveLocalUser(newUserRecord);
 
     const mockProf: Profile = {

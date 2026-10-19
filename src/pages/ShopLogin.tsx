@@ -54,11 +54,29 @@ export default function ShopLogin() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="username">{tr("shopLogin.username")}</Label>
-              <Input id="username" type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={tr("login.usernamePlaceholder")} required />
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder={tr("login.usernamePlaceholder")}
+                required
+              />
             </div>
             <div>
               <Label htmlFor="password">{tr("shopLogin.password")}</Label>
-              <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={tr("login.passwordPlaceholder")} required />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={tr("login.passwordPlaceholder")}
+                required
+              />
             </div>
             <div className="text-right">
               <Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">

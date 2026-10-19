@@ -27,7 +27,7 @@ export default function Signup() {
     setLoading(false);
     if (result.success) {
       toast.success(tr("signup.success"));
-      navigate("/login");
+      navigate("/marketplace");
     } else {
       toast.error(result.error || tr("signup.failed"));
     }
@@ -46,11 +46,69 @@ export default function Signup() {
             <p className="mt-1 text-sm text-muted-foreground">{tr("signup.subtitle")}</p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div><Label>{tr("signup.fullName")}</Label><Input value={form.name} onChange={set("name")} placeholder={tr("signup.namePlaceholder")} required /></div>
-            <div><Label>{tr("signup.email")}</Label><Input type="email" value={form.email} onChange={set("email")} placeholder={tr("signup.emailPlaceholder")} required /></div>
-            <div><Label>{tr("signup.phone")}</Label><Input value={form.phone} onChange={set("phone")} placeholder={tr("signup.phonePlaceholder")} required /></div>
-            <div><Label>{tr("signup.username")}</Label><Input value={form.username} onChange={set("username")} placeholder={tr("signup.usernamePlaceholder")} required /></div>
-            <div><Label>{tr("signup.password")}</Label><Input type="password" value={form.password} onChange={set("password")} placeholder={tr("signup.passwordPlaceholder")} required /></div>
+            <div>
+              <Label htmlFor="signup-name">{tr("signup.fullName")}</Label>
+              <Input
+                id="signup-name"
+                name="name"
+                autoComplete="name"
+                value={form.name}
+                onChange={set("name")}
+                placeholder={tr("signup.namePlaceholder")}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="signup-email">{tr("signup.email")}</Label>
+              <Input
+                id="signup-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={form.email}
+                onChange={set("email")}
+                placeholder={tr("signup.emailPlaceholder")}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="signup-phone">{tr("signup.phone")}</Label>
+              <Input
+                id="signup-phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                value={form.phone}
+                onChange={set("phone")}
+                placeholder={tr("signup.phonePlaceholder")}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="signup-username">{tr("signup.username")}</Label>
+              <Input
+                id="signup-username"
+                name="username"
+                autoComplete="username"
+                value={form.username}
+                onChange={set("username")}
+                placeholder={tr("signup.usernamePlaceholder")}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="signup-password">{tr("signup.password")}</Label>
+              <Input
+                id="signup-password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                value={form.password}
+                onChange={set("password")}
+                placeholder={tr("signup.passwordPlaceholder")}
+                required
+              />
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? tr("signup.creating") : tr("signup.createAccount")}
             </Button>

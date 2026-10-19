@@ -111,11 +111,11 @@ export default function RegisterShop() {
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
                 <User className="h-4 w-4" /> {tr("register.ownerDetails")}
               </div>
-              <div><Label>{tr("register.fullName")}</Label><Input value={userForm.name} onChange={setUser("name")} placeholder={tr("signup.namePlaceholder")} required /></div>
-              <div><Label>{tr("register.email")}</Label><Input type="email" value={userForm.email} onChange={setUser("email")} placeholder={tr("signup.emailPlaceholder")} required /></div>
-              <div><Label>{tr("register.phone")}</Label><Input value={userForm.phone} onChange={setUser("phone")} placeholder={tr("signup.phonePlaceholder")} required /></div>
-              <div><Label>{tr("register.username")}</Label><Input value={userForm.username} onChange={setUser("username")} placeholder={tr("signup.usernamePlaceholder")} required /></div>
-              <div><Label>{tr("register.password")}</Label><Input type="password" value={userForm.password} onChange={setUser("password")} placeholder={tr("signup.passwordPlaceholder")} required /></div>
+              <div><Label>{tr("register.fullName")}</Label><Input name="name" autoComplete="name" value={userForm.name} onChange={setUser("name")} placeholder={tr("signup.namePlaceholder")} required /></div>
+              <div><Label>{tr("register.email")}</Label><Input name="email" type="email" autoComplete="email" value={userForm.email} onChange={setUser("email")} placeholder={tr("signup.emailPlaceholder")} required /></div>
+              <div><Label>{tr("register.phone")}</Label><Input name="phone" type="tel" autoComplete="tel" value={userForm.phone} onChange={setUser("phone")} placeholder={tr("signup.phonePlaceholder")} required /></div>
+              <div><Label>{tr("register.username")}</Label><Input name="username" autoComplete="username" value={userForm.username} onChange={setUser("username")} placeholder={tr("signup.usernamePlaceholder")} required /></div>
+              <div><Label>{tr("register.password")}</Label><Input name="password" type="password" autoComplete="new-password" value={userForm.password} onChange={setUser("password")} placeholder={tr("signup.passwordPlaceholder")} required /></div>
               <Button type="submit" className="w-full">{tr("register.next")}</Button>
             </form>
           ) : (
