@@ -52,7 +52,8 @@ export interface MLModelMeta {
   generated_at: string;
 }
 
-const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/smart-ai`;
+const SUPABASE_BASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://gmefpiakwxlecfuxeugl.supabase.co";
+const BASE = `${SUPABASE_BASE_URL}/functions/v1/smart-ai`;
 
 /**
  * Calls the deployed Random Forest model (loaded from `model_bundle.json`)
